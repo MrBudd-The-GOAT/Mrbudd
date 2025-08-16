@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fruit Splat: Bouncing Tens Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: #e0ffe0;
+    }
+
+    #question {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      font-weight: bold;
+      background: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      z-index: 10;
+    }
+
+    #score {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 20px;
+      background: white;
+      padding: 5px 10px;
+      border-radius: 8px;
+      z-index: 10;
+    }
+
+    .fruit {
+      position: absolute;
+      width: 110px;
+      height: 110px;
+      font-size: 90px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Twemoji", sans-serif;
+      transition: transform 0.3s ease;
+    }
+
+    .fruit .number {
+      position: absolute;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      font-family: 'Arial Black', Arial, sans-serif;
+      color: black;
+      text-shadow:
+        -1px -1px 0 white,
+        1px -1px 0 white,
+        -1px 1px 0 white,
+        1px 1px 0 white;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Base splat style, colors overridden inline */
+    .fruit.splat {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      font-size: 0;
+      color: transparent;
+      animation: splatAnim 0.8s forwards; /* faster animation */
+    }
+
+    @keyframes splatAnim {
+      0% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1.8) rotate(15deg);
+        opacity: 1;
+      }
+    }
+
+    /* Cross overlay for wrong answer */
+    .fruit.wrong::after {
+      content: "✗";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px;
+      color: red;
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 1px 1px 2px black;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+
+<div id="question">How many 10s in ___?</div>
+<div id="score">Score: 0</div>
+
+<script>
+  const questionEl = document.getElementById('question');
+  const scoreEl = document.getElementById('score');
+  let score = 0;
+  let correctAnswer = 0;
+
+  const fruitData = [
+    { emoji: '🍎', color: '#e63946' },
+    { emoji: '🍊', color: '#f4a261' },
+    { emoji: '🍋', color: '#ffe066' }
+  ];
+
+  function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function generateQuestion() {
+    const num = getRandomInt(100, 999);
+    correctAnswer = Math.floor(num / 10);
+    questionEl.textContent = `How many 10s in ${num}?`;
+  }
+
+  function spawnFruit(value, isCorrect) {
+    const fruit = document.createElement('div');
+    fruit.classList.add('fruit');
+
+    const fruitIndex = getRandomInt(0, fruitData.length -1);
+    const { emoji, color } = fruitData[fruitIndex];
+
+    fruit.textContent = emoji;
+    fruit.dataset.color = color;
+
+    const numberDiv = document.createElement('div');
+    numberDiv.classList.add('number');
+    numberDiv.textContent = value;
+    fruit.appendChild(numberDiv);
+
+    const x = getRandomInt(0, window.innerWidth - 110);
+    const y = getRandomInt(0, window.innerHeight - 110);
+    let dx = (Math.random() < 0.5 ? -1 : 1) * getRandomInt(1, 2);
+    let dy = (Math.random() < 0.5 ? -1 : 1) * getRandomInt(1, 2);
+
+    fruit.style.left = x + 'px';
+    fruit.style.top = y + 'px';
+    document.body.appendChild(fruit);
+
+    const move = () => {
+      let left = parseFloat(fruit.style.left);
+      let top = parseFloat(fruit.style.top);
+
+      if (left + dx < 0 || left + 110 + dx > window.innerWidth) dx = -dx;
+      if (top + dy < 0 || top + 110 + dy > window.innerHeight) dy = -dy;
+
+      fruit.style.left = (left + dx) + 'px';
+      fruit.style.top = (top + dy) + 'px';
+    };
+
+    const interval = setInterval(move, 30);
+
+    fruit.onclick = () => {
+      if (fruit.dataset.clicked) return; // prevent double-click
+      fruit.dataset.clicked = 'true';
+
+      clearInterval(interval);
+      if (isCorrect) {
+        fruit.textContent = '';
+        fruit.classList.add('splat');
+
+        const c = fruit.dataset.color;
+        fruit.style.background = c;
+        fruit.style.boxShadow =
+          `10px 10px 0 0 ${c},
+           -10px 10px 0 0 ${c},
+           0 -10px 0 0 ${c},
+           15px 0 0 0 ${c},
+           -15px 0 0 0 ${c},
+           0 15px 0 0 ${c},
+           12px 12px 0 0 ${c},
+           -12px 12px 0 0 ${c}`;
+
+        setTimeout(() => {
+          fruit.remove();
+          score++;
+          scoreEl.textContent = `Score: ${score}`;
+          document.querySelectorAll('.fruit').forEach(f => f.remove());
+          startGame();
+        }, 800);
+      } else {
+        fruit.classList.add('wrong');
+        setTimeout(() => {
+          fruit.remove();
+          score = Math.max(score - 1, 0);
+          scoreEl.textContent = `Score: ${score}`;
+        }, 600);
+      }
+    };
+  }
+
+  function startGame() {
+    generateQuestion();
+    const answers = new Set();
+    answers.add(correctAnswer);
+    while (answers.size < 4) {
+      let fake = correctAnswer + getRandomInt(-10, 10);
+      if (fake >= 0) answers.add(fake);
+    }
+
+    Array.from(answers).forEach(ans => {
+      spawnFruit(ans, ans === correctAnswer);
+    });
+  }
+
+  startGame();
+</script>
+
+</body>
+</html>

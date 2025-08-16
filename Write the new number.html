@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Duck Shooting Carnival — Timer Wrong Answer Fix</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap');
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #87CEEB;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    user-select: none;
+  }
+
+  #title { position: absolute; top: 40px; width: 100%; text-align: center; font-size: 60px; color: yellow; -webkit-text-stroke: 2px red; font-family: 'Luckiest Guy', cursive; }
+
+  #score { position: absolute; top: 100px; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #222; }
+
+  #timer, #totalTimer { position: absolute; width: 100%; text-align: center; font-size: 26px; font-weight: bold; color: darkred; display: none; }
+  #timer { top: 135px; }
+  #totalTimer { top: 165px; }
+
+  #question { position: absolute; top: 200px; width: 100%; text-align: center; font-size: 36px; font-weight: bold; color: #333; }
+  #questionText { display:block; }
+  #correctAnswerFlash { display: none; font-size: 32px; font-weight: bold; color: green; margin-left: 10px; }
+
+  #modeSelect, #timeSelect { position: absolute; top: 260px; width: 100%; text-align: center; font-size: 28px; font-weight: bold; color: #333; }
+
+  #modeSelect button, #timeSelect button, .restartBtn { font-size: 22px; margin: 10px; padding: 10px 20px; cursor: pointer; }
+
+  #backMenuBtn { position: absolute; top: 230px; left: 20px; font-size: 20px; padding: 5px 10px; cursor: pointer; display: none; }
+
+  #fence { position: absolute; bottom: 0; left: 0; width: 100%; height: 30%; background-color: #8B4513; z-index: 5; }
+
+  .duck { position: absolute; width: 280px; height: 280px; cursor: pointer; z-index: 10; transition: transform 0.8s ease, bottom 0.8s ease, opacity 0.3s ease; }
+
+  .duck-inner { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; perspective: 800px; }
+
+  .duck .duck-emoji { font-size: 240px; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); z-index: 0; }
+
+  .duck .target { position: absolute; width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+  .target .outer { position: absolute; width: 100%; height: 100%; border-radius: 50%; background-color: red; }
+  .target .middle { position: absolute; width: 60%; height: 60%; border-radius: 50%; background-color: white; }
+  .target .center { position: absolute; width: 20%; height: 20%; border-radius: 50%; background-color: red; }
+
+  .number { position: absolute; font-size: 28px; font-weight: bold; color: black; text-align: center; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 2; text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white; }
+
+  .correct-highlight { border: 5px solid limegreen; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div id="title">Duck Shooting Carnival</div>
+<div id="score">Score: 0 out of 0</div>
+<div id="timer"></div>
+<div id="totalTimer"></div>
+
+<div id="question">
+  <span id="questionText">Choose a mode to start!</span>
+  <span id="correctAnswerFlash"></span>
+</div>
+
+<div id="modeSelect">
+  <button onclick="pickMode('practice')">Practice Mode</button>
+  <button onclick="pickMode('timed')">Timed Challenge</button>
+</div>
+
+<div id="timeSelect" style="display:none;">
+  Pick seconds per round:<br>
+  <button onclick="startGame(5)">5s</button>
+  <button onclick="startGame(10)">10s</button>
+  <button onclick="startGame(15)">15s</button>
+</div>
+
+<button id="backMenuBtn" onclick="restartGame()">Back to Menu</button>
+
+<div id="fence"></div>
+
+<script>
+const numberOfDucks = 5;
+let ducks = [];
+const questionTextEl = document.getElementById('questionText');
+const correctFlashEl = document.getElementById('correctAnswerFlash');
+const scoreEl = document.getElementById('score');
+const timerEl = document.getElementById('timer');
+const totalTimerEl = document.getElementById('totalTimer');
+const backMenuBtn = document.getElementById('backMenuBtn');
+
+let correctAnswer = null;
+let score = 0;
+let total = 0;
+let questionResolved = false;
+let mode = 'practice';
+let perRound = 0;
+let timerInterval = null;
+let totalTimerInterval = null;
+let timeLeft = 0;
+let totalTimeLeft = 0;
+
+function updateScore() { scoreEl.textContent = `Score: ${score} out of ${total}`; }
+
+function pickMode(selectedMode) {
+  mode = selectedMode;
+  document.getElementById('modeSelect').style.display = 'none';
+  backMenuBtn.style.display = 'inline';
+  if (mode === 'timed') document.getElementById('timeSelect').style.display = 'block';
+  else startGame(0);
+}
+
+function startGame(seconds) {
+  document.getElementById('timeSelect').style.display = 'none';
+  perRound = seconds;
+  score = 0; total = 0;
+  updateScore();
+  correctFlashEl.style.display = 'none';
+  if (mode === 'timed') {
+    totalTimeLeft = 120;
+    totalTimerEl.style.display = 'block';
+    updateTotalTimer();
+    clearInterval(totalTimerInterval);
+    totalTimerInterval = setInterval(() => {
+      totalTimeLeft--;
+      updateTotalTimer();
+      if (totalTimeLeft <= 0) endGame();
+    },1000);
+  }
+  generateQuestion();
+}
+
+function updateTotalTimer() { totalTimerEl.textContent = `Total Time: ${Math.floor(totalTimeLeft/60)}:${(totalTimeLeft%60).toString().padStart(2,'0')}`; }
+
+function startTimer() {
+  if(mode!=='timed') return;
+  clearInterval(timerInterval);
+  timeLeft = perRound;
+  timerEl.style.display = 'block';
+  timerEl.textContent = `Round Time: ${timeLeft}s`;
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    timerEl.textContent = `Round Time: ${timeLeft}s`;
+    if(timeLeft<=0){ clearInterval(timerInterval); total++; updateScore(); resolveRoundWithCorrectReveal(); }
+  },1000);
+}
+
+function stopTimer() { clearInterval(timerInterval); timerEl.style.display = mode==='timed'?'block':'none'; }
+
+function generateQuestion() {
+  ducks.forEach(d=>d.remove()); ducks=[];
+  questionResolved=false; stopTimer(); correctFlashEl.style.display='none';
+
+  const mags=[1,10,100];
+  let base,diff,correct;
+  do { base=Math.floor(Math.random()*1000)+1; const mag=mags[Math.floor(Math.random()*mags.length)]; const sign=Math.random()<0.5?1:-1; diff=mag*sign; correct=base+diff;} while(correct<1||correct>1000);
+  correctAnswer=correct;
+  const diffText=Math.abs(diff); const moreLess=diff>0?'more':'less';
+  questionTextEl.innerHTML=`Shoot the duck that is<br><span style="color:red">${diffText} ${moreLess} than ${base}</span>`;
+
+  spawnDucks(); startTimer();
+}
+
+function spawnDucks() {
+  const answers=[correctAnswer];
+  while(answers.length<numberOfDucks){ const v=Math.floor(Math.random()*1000)+1; if(!answers.includes(v)) answers.push(v);}
+  answers.sort(()=>Math.random()-0.5);
+
+  const fenceTop = window.innerHeight*0.3; const overlap=80; const duckBottom=fenceTop-overlap-50;
+
+  answers.forEach((value,idx)=>{
+    const duck=document.createElement('div'); duck.className='duck';
+    duck.style.left=`${10+idx*18}%`; duck.style.bottom=`${duckBottom}px`;
+    duck.dataset.value=String(value); duck.dataset.clicked='0';
+    const inner=document.createElement('div'); inner.className='duck-inner';
+    inner.innerHTML=`<div class="duck-emoji">🦆</div><div class="target"><div class="outer"></div><div class="middle"></div><div class="center"></div></div><div class="number">${value}</div>`;
+    duck.appendChild(inner);
+    duck.addEventListener('click',()=>{
+      if(questionResolved||duck.dataset.clicked==='1') return;
+      duck.dataset.clicked='1'; duck.style.pointerEvents='none';
+      questionResolved=true; const v=Number(duck.dataset.value); total++; updateScore();
+      if(v===correctAnswer){ score++; stopTimer(); ducks.forEach(d=>d.style.pointerEvents='none');
+        duck.style.transition='transform 0.8s ease, bottom 0.8s ease'; duck.style.transform='rotateX(75deg)'; duck.style.bottom=`${parseInt(duck.style.bottom,10)-30}px`;
+        setTimeout(()=>{ nextQuestion(); },900);
+      } else { 
+        duck.style.transform='rotateZ(20deg)'; duck.style.opacity=0; 
+        // Show green bracket answer in both timer and practice mode
+        resolveRoundWithCorrectReveal(true); 
+      }
+    });
+    document.body.appendChild(duck); ducks.push(duck);
+  });
+}
+
+function resolveRoundWithCorrectReveal(wrong=false) {
+  stopTimer(); ducks.forEach(d=>d.style.pointerEvents='none');
+  ducks.forEach(d=>{ if(Number(d.dataset.value)===correctAnswer){ const target=d.querySelector('.target'); if(target) target.classList.add('correct-highlight'); }});
+  if(wrong) correctFlashEl.textContent=`(Correct: ${correctAnswer})`; else correctFlashEl.textContent='';
+  correctFlashEl.style.display=wrong?'inline':'none';
+  setTimeout(()=>{ correctFlashEl.style.display='none'; nextQuestion(); },1100);
+}
+
+function nextQuestion() {
+  ducks.forEach(d=>d.remove()); ducks=[];
+  updateScore();
+  if(mode==='timed' && totalTimeLeft<=0) { endGame(); return; }
+  generateQuestion();
+}
+
+function endGame() {
+  clearInterval(totalTimerInterval); clearInterval(timerInterval); ducks.forEach(d=>d.remove()); ducks=[];
+  timerEl.style.display='none'; totalTimerEl.style.display='none'; correctFlashEl.style.display='none';
+  questionTextEl.innerHTML=`Time’s up! Final score: ${score} out of ${total}`;
+}
+
+function restartGame() {
+  clearInterval(totalTimerInterval); 
+  clearInterval(timerInterval);
+  ducks.forEach(d => d.remove()); 
+  ducks = [];
+  document.getElementById('modeSelect').style.display='block';
+  document.getElementById('timeSelect').style.display='none';
+  questionTextEl.textContent='Choose a mode to start!';
+  score=0; total=0; 
+  updateScore();
+  correctFlashEl.style.display='none';
+  timerEl.style.display='none'; 
+  totalTimerEl.style.display='none';
+  backMenuBtn.style.display='none';
+}
+
+window.onload = ()=>{ updateScore(); };
+</script>
+</body>
+</html>
